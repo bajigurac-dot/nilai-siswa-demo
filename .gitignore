@@ -1,0 +1,21 @@
+# Database asli — JANGAN di-commit
+absensi.db
+
+# Database demo (di-generate otomatis saat run)
+demo.db
+
+# File app asli — JANGAN di-commit
+app.py
+tray.py
+run.bat
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Virtual environment
+venv/
+env/
+.venv/

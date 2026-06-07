@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog — Dashboard Nilai & Absensi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f0f4ff; }
+        .navbar { background: linear-gradient(135deg, #1a56db 0%, #7e3af2 100%); }
+        .card { border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+        .timeline { position: relative; padding-left: 2rem; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.6rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #1a56db, #7e3af2, #e5e7eb);
+        }
+        .timeline-item { position: relative; margin-bottom: 2rem; }
+        .timeline-dot {
+            position: absolute;
+            left: -1.65rem;
+            top: 0.4rem;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: #1a56db;
+            border: 2px solid white;
+            box-shadow: 0 0 0 3px #1a56db33;
+        }
+        .timeline-dot.latest {
+            background: #057a55;
+            box-shadow: 0 0 0 3px #057a5533;
+            width: 1.2rem;
+            height: 1.2rem;
+            left: -1.75rem;
+            top: 0.3rem;
+        }
+        .version-card { border-left: 4px solid #1a56db; }
+        .version-card.latest { border-left-color: #057a55; }
+        .check-item { color: #057a55; }
+        .roadmap-item { color: #c27803; }
+        .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; font-weight: 600; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark px-4 py-3 mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <a href="/" class="text-white text-decoration-none">
+            <span class="fw-bold fs-5"><i class="bi bi-mortarboard-fill me-2"></i>Dashboard Nilai & Absensi</span>
+        </a>
+        <div class="text-white-50 small">AI dan Microsoft Office / KKA</div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-white text-end">
+            <div class="fw-semibold small"><i class="bi bi-person-badge me-1"></i>{{ session.nama }}</div>
+            <div class="text-white-50 small">{{ session.role | capitalize }}</div>
+        </div>
+        <a href="/" class="btn btn-outline-light btn-sm"><i class="bi bi-arrow-left me-1"></i>Kembali</a>
+        <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right me-1"></i>Keluar</a>
+    </div>
+</nav>
+
+<div class="container pb-5" style="max-width: 860px;">
+
+    <!-- Header -->
+    <div class="card p-4 mb-4 text-center" style="background: linear-gradient(135deg, #1a56db, #7e3af2); color: white;">
+        <div class="fs-1 mb-2"><i class="bi bi-clock-history"></i></div>
+        <h3 class="fw-bold mb-1">Changelog</h3>
+        <div class="opacity-75">Riwayat pembaruan aplikasi Dashboard Nilai & Absensi</div>
+        <div class="mt-3">
+            <span class="badge bg-white text-success fw-semibold px-3 py-2" style="font-size:0.9rem;">
+                <i class="bi bi-patch-check-fill me-1"></i>Versi Terbaru: {{ latest }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+
+            <!-- Timeline Versi -->
+            <div class="timeline">
+                {% for v in versions %}
+                <div class="timeline-item">
+                    <div class="timeline-dot {% if loop.first %}latest{% endif %}"></div>
+                    <div class="card p-4 version-card {% if loop.first %}latest{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="badge bg-primary fs-6 px-3">{{ v.versi }}</span>
+                                    {% if v.label %}
+                                    <span class="badge bg-{{ v.label_color }}">
+                                        <i class="bi bi-stars me-1"></i>{{ v.label }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <h5 class="fw-bold mb-0">
+                                    <i class="bi bi-{{ v.icon }} text-primary me-2"></i>{{ v.judul }}
+                                </h5>
+                            </div>
+                            <div class="text-muted small text-end">
+                                <i class="bi bi-calendar3 me-1"></i>{{ v.tanggal }}
+                            </div>
+                        </div>
+
+                        {% for section_title, items in v.sections %}
+                        <div class="mb-3">
+                            <div class="section-title mb-2">{{ section_title }}</div>
+                            <ul class="list-unstyled mb-0">
+                                {% for item in items %}
+                                <li class="d-flex gap-2 mb-1 small">
+                                    <i class="bi bi-check-circle-fill check-item mt-1 flex-shrink-0"></i>
+                                    <span>{{ item }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+
+            <!-- Roadmap -->
+            <div class="card p-4 mb-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-map-fill text-warning me-2"></i>Roadmap</h5>
+                <ul class="list-unstyled mb-0">
+                    {% for item in roadmap %}
+                    <li class="d-flex gap-2 mb-2 small">
+                        <i class="bi bi-circle roadmap-item mt-1 flex-shrink-0"></i>
+                        <span class="text-muted">{{ item }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Tech Stack -->
+            <div class="card p-4 mb-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-cpu-fill text-primary me-2"></i>Tech Stack</h5>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for tech in [
+                        ('Flask', 'primary'), ('SQLite', 'secondary'), ('Pandas', 'success'),
+                        ('Bootstrap 5', 'info'), ('Chart.js', 'warning'), ('openpyxl', 'danger')
+                    ] %}
+                    <span class="badge bg-{{ tech[1] }} bg-opacity-10 text-{{ tech[1] }} border border-{{ tech[1] }} border-opacity-25 px-2 py-1">
+                        {{ tech[0] }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="card p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-info-circle-fill text-info me-2"></i>Info</h5>
+                <ul class="list-unstyled small text-muted mb-0">
+                    <li class="mb-2"><i class="bi bi-dot"></i>File xlsx nilai harus ada di path yang dikonfigurasi</li>
+                    <li class="mb-2"><i class="bi bi-dot"></i>Database <code>absensi.db</code> dibuat otomatis saat pertama run</li>
+                    <li class="mb-2"><i class="bi bi-dot"></i>Akun siswa di-generate dari xlsx saat startup</li>
+                    <li><i class="bi bi-dot"></i>Password default bisa direset di tab Admin</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

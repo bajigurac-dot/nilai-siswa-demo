@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Nilai & Absensi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { background-color: #f0f4ff; }
+        .navbar { background: linear-gradient(135deg, #1a56db 0%, #7e3af2 100%); }
+        .card { border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+        .stat-a { background: linear-gradient(135deg, #1a56db, #7e3af2); color:white; }
+        .stat-b { background: linear-gradient(135deg, #057a55, #0e9f6e); color:white; }
+        .stat-c { background: linear-gradient(135deg, #c27803, #e3a008); color:white; }
+        .stat-d { background: linear-gradient(135deg, #c81e1e, #f05252); color:white; }
+        .nav-tabs .nav-link { border-radius: 10px 10px 0 0; font-weight: 500; }
+        .nav-tabs .nav-link.active { background-color: #1a56db; color: white; border-color: #1a56db; }
+        .main-tabs .nav-link.active { background-color: #7e3af2; border-color: #7e3af2; }
+        thead th { background-color: #eef2ff; }
+        .rank-1 { color: #f59e0b; }
+        .rank-2 { color: #9ca3af; }
+        .rank-3 { color: #b45309; }
+        .badge-hadir { background-color: #057a55; }
+        .badge-sakit { background-color: #c27803; }
+        .badge-izin { background-color: #1a56db; }
+        .badge-alpha { background-color: #c81e1e; }
+    </style>
+</head>
+<body>
+{% if is_demo %}
+<div class="text-center py-2 small fw-semibold" style="background:#fef3c7;color:#92400e;border-bottom:1px solid #fde68a">
+    <i class="bi bi-stars me-1"></i>MODE DEMO — Data fiktif untuk keperluan demonstrasi. Tidak ada data nyata yang ditampilkan.
+</div>
+{% endif %}
+<nav class="navbar navbar-dark px-4 py-3 mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <span class="navbar-brand fw-bold fs-4"><i class="bi bi-mortarboard-fill me-2"></i>Dashboard Nilai & Absensi</span>
+        <div class="text-white-50 small">AI dan Microsoft Office / KKA — Kelas X, XI, XII</div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <a href="/changelog" class="btn btn-sm btn-outline-light">
+            <i class="bi bi-clock-history me-1"></i>v3.0.0
+        </a>
+        <div class="text-white text-end">
+            <div class="fw-semibold small"><i class="bi bi-person-badge me-1"></i>{{ session.nama }}</div>
+            <div class="text-white-50 small">Guru</div>
+        </div>
+        <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right me-1"></i>Keluar</a>
+    </div>
+</nav>
+
+<div class="container pb-5">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% if errors %}
+    {% for kelas, err in errors.items() %}
+    <div class="alert alert-warning">Gagal memuat Kelas {{ kelas }}: {{ err }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Main Tab: Nilai / Absensi / Admin -->
+    <ul class="nav nav-tabs main-tabs mb-0" id="mainTabs">
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab != 'absensi' and active_tab != 'admin' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tabNilai">
+                <i class="bi bi-bar-chart-fill me-1"></i>Nilai PTS
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'absensi' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tabAbsensi">
+                <i class="bi bi-calendar-check-fill me-1"></i>Absensi
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'admin' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tabAdmin">
+                <i class="bi bi-shield-lock-fill me-1"></i>Admin
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {% if active_tab == 'nilaidb' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tabNilaiDB">
+                <i class="bi bi-journal-plus me-1"></i>Kelola Nilai
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- ===== TAB NILAI ===== -->
+        <div class="tab-pane fade show active" id="tabNilai">
+            <div class="card" style="border-radius: 0 16px 16px 16px; padding: 1.5rem;">
+
+                {% if summary %}
+                <div class="d-flex justify-content-end mb-3">
+                    <a href="/export/nilai" class="btn btn-success btn-sm">
+                        <i class="bi bi-file-earmark-excel-fill me-1"></i>Export Nilai ke Excel
+                    </a>
+                </div>
+                <div class="row g-4 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="card stat-a p-4">
+                            <div class="small text-white-75 text-uppercase">Total Siswa</div>
+                            <div class="display-5 fw-bold">{{ summary.total_siswa }}</div>
+                            <div class="small opacity-75">Semua kelas</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card stat-b p-4">
+                            <div class="small text-white-75 text-uppercase">Rata-rata Gabungan</div>
+                            <div class="display-5 fw-bold">{{ summary.rata_rata_gabungan }}</div>
+                            <div class="small opacity-75">Semua kelas</div>
+                        </div>
+                    </div>
+                    {% for kelas in ['X', 'XI', 'XII'] %}
+                    {% if kelas in classes %}
+                    <div class="col-6 col-md-2">
+                        <div class="card bg-white p-3 text-center">
+                            <div class="small text-muted text-uppercase fw-bold">Kelas {{ kelas }}</div>
+                            <div class="fs-3 fw-bold text-primary">{{ classes[kelas].class_average }}</div>
+                            <div class="small text-muted">{{ classes[kelas].student_count }} siswa</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-5">
+                        <div class="card p-4 h-100">
+                            <h5 class="mb-3"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Perbandingan Rata-rata Kelas</h5>
+                            <canvas id="kelasChart" height="220"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="card p-4 h-100">
+                            <h5 class="mb-3"><i class="bi bi-trophy-fill text-warning me-2"></i>Ringkasan Per Kelas</h5>
+                            <table class="table table-bordered mb-0">
+                                <thead><tr><th>Kelas</th><th>Siswa</th><th>Rata-rata</th><th>Tertinggi</th><th>Terendah</th></tr></thead>
+                                <tbody>
+                                    {% for kelas in ['X', 'XI', 'XII'] %}
+                                    {% if kelas in classes %}
+                                    {% set c = classes[kelas] %}
+                                    <tr>
+                                        <td class="fw-bold">Kelas {{ kelas }}</td>
+                                        <td>{{ c.student_count }}</td>
+                                        <td><span class="badge bg-primary">{{ c.class_average }}</span></td>
+                                        <td class="text-success fw-semibold">{{ c.max_score }}</td>
+                                        <td class="text-danger fw-semibold">{{ c.min_score }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Tab Per Kelas -->
+                <ul class="nav nav-tabs mb-0" id="kelasTabs">
+                    {% for kelas in ['X', 'XI', 'XII'] %}
+                    {% if kelas in classes %}
+                    <li class="nav-item">
+                        <button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#kelas{{ kelas }}">
+                            <i class="bi bi-people-fill me-1"></i>Kelas {{ kelas }}
+                            <span class="badge bg-secondary ms-1">{{ classes[kelas].student_count }}</span>
+                        </button>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+
+                <div class="tab-content">
+                    {% for kelas in ['X', 'XI', 'XII'] %}
+                    {% if kelas in classes %}
+                    {% set c = classes[kelas] %}
+                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="kelas{{ kelas }}">
+                        <div class="card" style="border-radius: 0 16px 16px 16px;">
+                            <div class="row g-3 p-4 pb-0">
+                                <div class="col-6 col-md-3">
+                                    <div class="card stat-a p-3 text-center">
+                                        <div class="small opacity-75">Jumlah Siswa</div>
+                                        <div class="fs-3 fw-bold">{{ c.student_count }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="card stat-b p-3 text-center">
+                                        <div class="small opacity-75">Rata-rata</div>
+                                        <div class="fs-3 fw-bold">{{ c.class_average }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="card stat-c p-3 text-center">
+                                        <div class="small opacity-75">Nilai Tertinggi</div>
+                                        <div class="fs-3 fw-bold">{{ c.max_score }}</div>
+                                        <div class="small opacity-75 text-truncate">{{ c.highest }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="card stat-d p-3 text-center">
+                                        <div class="small opacity-75">Nilai Terendah</div>
+                                        <div class="fs-3 fw-bold">{{ c.min_score }}</div>
+                                        <div class="small opacity-75 text-truncate">{{ c.lowest }}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-4 pb-0">
+                                <div class="row g-3">
+                                    <div class="col-lg-4">
+                                        <h6 class="mb-2">Distribusi Grade</h6>
+                                        <canvas id="gradeChart{{ kelas }}" height="180"></canvas>
+                                    </div>
+                                    <div class="col-lg-8">
+                                        <h6 class="mb-2">Ringkasan Grade</h6>
+                                        <table class="table table-sm table-bordered text-center">
+                                            <thead><tr><th>Grade</th><th>Rentang</th><th>Jumlah</th><th>%</th></tr></thead>
+                                            <tbody>
+                                                {% set grade_info = [('A','90-100','#1a56db'),('B','80-89','#057a55'),('C','70-79','#c27803'),('D','60-69','#c81e1e'),('E','< 60','#6b7280')] %}
+                                                {% for g, rentang, color in grade_info %}
+                                                <tr>
+                                                    <td><span class="badge" style="background-color:{{ color }}">{{ g }}</span></td>
+                                                    <td>{{ rentang }}</td>
+                                                    <td>{{ c.grade_dist[g] }}</td>
+                                                    <td>{{ "%.1f"|format(c.grade_dist[g] / c.student_count * 100) }}%</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive p-4">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead>
+                                        <tr><th>Rank</th><th>Nama</th><th>Nilai</th><th>Grade</th><th>Waktu</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for s in c.students %}
+                                        <tr>
+                                            <td>
+                                                {% if s.Rank == 1 %}<i class="bi bi-trophy-fill rank-1"></i> 1
+                                                {% elif s.Rank == 2 %}<i class="bi bi-trophy-fill rank-2"></i> 2
+                                                {% elif s.Rank == 3 %}<i class="bi bi-trophy-fill rank-3"></i> 3
+                                                {% else %}{{ s.Rank }}{% endif %}
+                                            </td>
+                                            <td class="fw-semibold">{{ s.Nama }}</td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="progress flex-grow-1" style="height:8px">
+                                                        <div class="progress-bar" style="width:{{ s.Nilai }}%; background-color:
+                                                            {% if s.Nilai >= 90 %}#1a56db{% elif s.Nilai >= 80 %}#057a55{% elif s.Nilai >= 70 %}#c27803{% else %}#c81e1e{% endif %}">
+                                                        </div>
+                                                    </div>
+                                                    <span>{{ s.Nilai|int }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge" style="background-color:
+                                                    {% if s.Grade == 'A' %}#1a56db{% elif s.Grade == 'B' %}#057a55{% elif s.Grade == 'C' %}#c27803{% elif s.Grade == 'D' %}#c81e1e{% else %}#6b7280{% endif %}">
+                                                    {{ s.Grade }}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted small">{{ s.Waktu }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ===== TAB ABSENSI ===== -->
+        <div class="tab-pane fade" id="tabAbsensi">
+            <div class="card" style="border-radius: 0 16px 16px 16px; padding: 1.5rem;">
+
+                <!-- Form Input Absensi -->
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-8">
+                        <div class="card p-4">
+                            <h5 class="mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Input Absensi</h5>
+                            <form method="POST" action="/absensi/simpan" id="formAbsensi">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Kelas</label>
+                                        <select class="form-select" name="kelas" id="selectKelas" required onchange="loadSiswa()">
+                                            <option value="">-- Pilih Kelas --</option>
+                                            <option value="X">Kelas X</option>
+                                            <option value="XI">Kelas XI</option>
+                                            <option value="XII">Kelas XII</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Tanggal</label>
+                                        <input type="date" class="form-control" name="tanggal" id="inputTanggal" value="{{ today }}" required>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <button type="button" class="btn btn-outline-primary w-100" onclick="loadSiswa()">
+                                            <i class="bi bi-people-fill me-1"></i>Muat Daftar Siswa
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="daftarSiswa" class="d-none">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">Daftar Siswa</h6>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-success" onclick="setAllStatus('Hadir')">Semua Hadir</button>
+                                            <button type="button" class="btn btn-outline-danger" onclick="setAllStatus('Alpha')">Semua Alpha</button>
+                                        </div>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered">
+                                            <thead><tr><th>#</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead>
+                                            <tbody id="tabelSiswa"></tbody>
+                                        </table>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100 mt-2">
+                                        <i class="bi bi-save-fill me-1"></i>Simpan Absensi
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Rekap Hari Ini -->
+                    <div class="col-lg-4">
+                        <div class="card p-4 h-100">
+                            <h5 class="mb-3"><i class="bi bi-calendar-day text-success me-2"></i>Rekap Hari Ini</h5>
+                            {% set total_hadir = absensi_hari_ini.values() | selectattr('status', 'equalto', 'Hadir') | list | length %}
+                            {% set total_sakit = absensi_hari_ini.values() | selectattr('status', 'equalto', 'Sakit') | list | length %}
+                            {% set total_izin = absensi_hari_ini.values() | selectattr('status', 'equalto', 'Izin') | list | length %}
+                            {% set total_alpha = absensi_hari_ini.values() | selectattr('status', 'equalto', 'Alpha') | list | length %}
+                            <div class="row g-2 mb-3">
+                                <div class="col-6"><div class="card p-2 text-center" style="background:#d1fae5"><div class="fw-bold text-success fs-4">{{ total_hadir }}</div><div class="small text-success">Hadir</div></div></div>
+                                <div class="col-6"><div class="card p-2 text-center" style="background:#fef3c7"><div class="fw-bold text-warning fs-4">{{ total_sakit }}</div><div class="small text-warning">Sakit</div></div></div>
+                                <div class="col-6"><div class="card p-2 text-center" style="background:#dbeafe"><div class="fw-bold text-primary fs-4">{{ total_izin }}</div><div class="small text-primary">Izin</div></div></div>
+                                <div class="col-6"><div class="card p-2 text-center" style="background:#fee2e2"><div class="fw-bold text-danger fs-4">{{ total_alpha }}</div><div class="small text-danger">Alpha</div></div></div>
+                            </div>
+                            <div class="small text-muted text-center">{{ today }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rekap Absensi Per Kelas -->
+                <div class="d-flex justify-content-between align-items-center mb-0">
+                    <ul class="nav nav-tabs mb-0" id="absensiTabs">
+                        {% for kelas in ['X', 'XI', 'XII'] %}
+                        <li class="nav-item">
+                            <button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#absensiKelas{{ kelas }}">
+                                <i class="bi bi-clipboard-check me-1"></i>Kelas {{ kelas }}
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="d-flex gap-2 pb-1">
+                        <div class="dropdown">
+                            <button class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="bi bi-file-earmark-excel-fill me-1"></i>Export Absensi
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="/export/absensi">Semua Kelas</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/export/absensi?kelas=X">Kelas X</a></li>
+                                <li><a class="dropdown-item" href="/export/absensi?kelas=XI">Kelas XI</a></li>
+                                <li><a class="dropdown-item" href="/export/absensi?kelas=XII">Kelas XII</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content">
+                    {% for kelas in ['X', 'XI', 'XII'] %}
+                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="absensiKelas{{ kelas }}">
+                        <div class="card" style="border-radius: 0 16px 16px 16px;">
+                            <div class="table-responsive p-4">
+                                {% set rows = absensi_summary[kelas] %}
+                                {% if rows %}
+                                <!-- Sub-tab: Rekap / Detail -->
+                                <ul class="nav nav-tabs nav-sm mb-2" id="subTab{{ kelas }}">
+                                    <li class="nav-item"><button class="nav-link active py-1 px-3" data-bs-toggle="tab" data-bs-target="#rekap{{ kelas }}">Rekap</button></li>
+                                    <li class="nav-item"><button class="nav-link py-1 px-3" data-bs-toggle="tab" data-bs-target="#detail{{ kelas }}">Detail per Tanggal</button></li>
+                                </ul>
+                                <div class="tab-content">
+                                <!-- Rekap per siswa -->
+                                <div class="tab-pane fade show active" id="rekap{{ kelas }}">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Nama</th>
+                                            <th class="text-center text-success">Hadir</th>
+                                            <th class="text-center text-warning">Sakit</th>
+                                            <th class="text-center text-primary">Izin</th>
+                                            <th class="text-center text-danger">Alpha</th>
+                                            <th class="text-center">Total</th>
+                                            <th class="text-center">% Hadir</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for r in rows %}
+                                        <tr>
+                                            <td class="fw-semibold">{{ r.nama }}</td>
+                                            <td class="text-center"><span class="badge badge-hadir">{{ r.hadir }}</span></td>
+                                            <td class="text-center"><span class="badge badge-sakit">{{ r.sakit }}</span></td>
+                                            <td class="text-center"><span class="badge badge-izin">{{ r.izin }}</span></td>
+                                            <td class="text-center"><span class="badge badge-alpha">{{ r.alpha }}</span></td>
+                                            <td class="text-center">{{ r.total }}</td>
+                                            <td class="text-center">
+                                                {% set pct = (r.hadir / r.total * 100) | round(1) %}
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <div class="progress flex-grow-1" style="height:6px">
+                                                        <div class="progress-bar bg-success" style="width:{{ pct }}%"></div>
+                                                    </div>
+                                                    <small>{{ pct }}%</small>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                </div>
+                                <!-- Detail per tanggal dengan tombol edit/hapus -->
+                                <div class="tab-pane fade" id="detail{{ kelas }}">
+                                {% set detail_rows = absensi_detail[kelas] %}
+                                {% if detail_rows %}
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead><tr><th>Tanggal</th><th>Nama</th><th>Status</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+                                    <tbody>
+                                        {% for d in detail_rows %}
+                                        <tr>
+                                            <td class="text-muted small">{{ d.tanggal }}</td>
+                                            <td class="fw-semibold">{{ d.nama }}</td>
+                                            <td>
+                                                <span class="badge
+                                                    {% if d.status == 'Hadir' %}badge-hadir
+                                                    {% elif d.status == 'Sakit' %}badge-sakit
+                                                    {% elif d.status == 'Izin' %}badge-izin
+                                                    {% else %}badge-alpha{% endif %}">
+                                                    {{ d.status }}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted small">{{ d.keterangan or '-' }}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-warning py-0"
+                                                    onclick="bukaEdit({{ d.id }}, '{{ d.nama }}', '{{ d.tanggal }}', '{{ d.status }}', '{{ d.keterangan or '' }}')"
+                                                    data-bs-toggle="modal" data-bs-target="#modalEdit">
+                                                    <i class="bi bi-pencil-fill"></i>
+                                                </button>
+                                                <a href="/absensi/hapus/{{ d.id }}" class="btn btn-sm btn-outline-danger py-0"
+                                                    onclick="return confirm('Hapus data ini?')">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% else %}
+                                <div class="text-center text-muted py-3">Belum ada data detail</div>
+                                {% endif %}
+                                </div>
+                                </div><!-- end sub tab-content -->
+                                {% else %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-1"></i>
+                                    <p class="mt-2">Belum ada data absensi untuk Kelas {{ kelas }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ===== TAB ADMIN ===== -->
+        <div class="tab-pane fade {% if active_tab == 'admin' %}show active{% endif %}" id="tabAdmin">
+            <div class="card" style="border-radius: 0 16px 16px 16px; padding: 1.5rem;">
+                <div class="row g-4">
+
+                    <!-- Tambah Siswa -->
+                    <div class="col-12">
+                        <div class="card p-4">
+                            <div class="row g-4">
+                                <div class="col-lg-5">
+                                    <h5 class="mb-3"><i class="bi bi-person-plus-fill text-success me-2"></i>Tambah Siswa Baru</h5>
+                                    <p class="text-muted small mb-3">Untuk siswa yang belum ada di file xlsx. Akan otomatis muncul di daftar absensi dan input nilai.</p>
+                                    <form method="POST" action="/siswa/tambah" class="d-flex gap-2">
+                                        <input type="text" class="form-control" name="nama" placeholder="Nama lengkap siswa" required>
+                                        <select class="form-select" name="kelas" style="max-width:110px" required>
+                                            <option value="">Kelas</option>
+                                            <option value="X">X</option>
+                                            <option value="XI">XI</option>
+                                            <option value="XII">XII</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-success text-nowrap">
+                                            <i class="bi bi-plus-lg me-1"></i>Tambah
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="col-lg-7">
+                                    <h6 class="mb-2">Daftar Siswa Tambahan</h6>
+                                    {% if siswa_tambahan %}
+                                    <div class="table-responsive" style="max-height:180px;overflow-y:auto">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead><tr><th>Nama</th><th>Kelas</th><th></th></tr></thead>
+                                            <tbody>
+                                                {% for s in siswa_tambahan %}
+                                                <tr>
+                                                    <td class="fw-semibold">{{ s.nama }}</td>
+                                                    <td><span class="badge bg-primary">{{ s.kelas }}</span></td>
+                                                    <td>
+                                                        <a href="/siswa/hapus/{{ s.id }}" class="btn btn-sm btn-outline-danger py-0"
+                                                            onclick="return confirm('Hapus {{ s.nama }}?')">
+                                                            <i class="bi bi-trash-fill"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-muted small py-2"><i class="bi bi-info-circle me-1"></i>Belum ada siswa tambahan</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manajemen User -->
+                    <div class="col-lg-6">
+                        <div class="card p-4">
+                            <h5 class="mb-3"><i class="bi bi-people-fill text-primary me-2"></i>Manajemen Akun</h5>
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm table-hover">
+                                    <thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Kelas</th><th>Aksi</th></tr></thead>
+                                    <tbody>
+                                        {% for u in users %}
+                                        <tr>
+                                            <td><code>{{ u.username }}</code></td>
+                                            <td>{{ u.nama }}</td>
+                                            <td><span class="badge {% if u.role == 'guru' %}bg-primary{% else %}bg-success{% endif %}">{{ u.role }}</span></td>
+                                            <td>{{ u.kelas or '-' }}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-secondary py-0"
+                                                    onclick="bukaReset({{ u.id }}, '{{ u.username }}')"
+                                                    data-bs-toggle="modal" data-bs-target="#modalReset">
+                                                    <i class="bi bi-key-fill"></i>
+                                                </button>
+                                                {% if u.id != session.user_id %}
+                                                <a href="/users/hapus/{{ u.id }}" class="btn btn-sm btn-outline-danger py-0"
+                                                    onclick="return confirm('Hapus akun {{ u.username }}?')">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Form tambah user -->
+                            <h6 class="mb-2"><i class="bi bi-person-plus-fill me-1"></i>Tambah Akun</h6>
+                            <form method="POST" action="/users/tambah">
+                                <div class="row g-2">
+                                    <div class="col-6"><input type="text" class="form-control form-control-sm" name="username" placeholder="Username" required></div>
+                                    <div class="col-6"><input type="text" class="form-control form-control-sm" name="password" placeholder="Password" required></div>
+                                    <div class="col-6"><input type="text" class="form-control form-control-sm" name="nama" placeholder="Nama lengkap" required></div>
+                                    <div class="col-3">
+                                        <select class="form-select form-select-sm" name="role" id="roleSelect" onchange="toggleKelas()">
+                                            <option value="siswa">Siswa</option>
+                                            <option value="guru">Guru</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-3" id="kelasDiv">
+                                        <select class="form-select form-select-sm" name="kelas">
+                                            <option value="">-- Kelas --</option>
+                                            <option value="X">X</option>
+                                            <option value="XI">XI</option>
+                                            <option value="XII">XII</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                                            <i class="bi bi-person-plus-fill me-1"></i>Tambah Akun
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Query DB -->
+                    <div class="col-lg-6">
+                        <div class="card p-4">
+                            <h5 class="mb-3"><i class="bi bi-terminal-fill text-warning me-2"></i>Query Database</h5>
+                            <form method="POST" action="/admin/query">
+                                <div class="mb-2">
+                                    <textarea class="form-control font-monospace" name="sql" rows="4"
+                                        placeholder="SELECT * FROM absensi LIMIT 10">{{ admin_sql or '' }}</textarea>
+                                </div>
+                                <div class="d-flex gap-2 mb-3">
+                                    <button type="submit" class="btn btn-warning btn-sm">
+                                        <i class="bi bi-play-fill me-1"></i>Jalankan
+                                    </button>
+                                    <div class="dropdown">
+                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">Contoh Query</button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item small" href="#" onclick="setQuery('SELECT * FROM absensi ORDER BY tanggal DESC LIMIT 20')">Lihat absensi terbaru</a></li>
+                                            <li><a class="dropdown-item small" href="#" onclick="setQuery('SELECT * FROM users')">Lihat semua user</a></li>
+                                            <li><a class="dropdown-item small" href="#" onclick="setQuery('SELECT kelas, tanggal, COUNT(*) as total FROM absensi GROUP BY kelas, tanggal ORDER BY tanggal DESC')">Rekap per tanggal</a></li>
+                                            <li><a class="dropdown-item small" href="#" onclick="setQuery('DELETE FROM absensi WHERE tanggal = \'YYYY-MM-DD\'')">Hapus per tanggal</a></li>
+                                            <li><a class="dropdown-item small" href="#" onclick="setQuery('DELETE FROM absensi')">Hapus SEMUA absensi</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </form>
+                            {% if admin_error %}
+                            <div class="alert alert-danger py-2 small"><i class="bi bi-x-circle me-1"></i>{{ admin_error }}</div>
+                            {% endif %}
+                            {% if admin_columns %}
+                            <div class="table-responsive" style="max-height:300px; overflow-y:auto">
+                                <table class="table table-sm table-bordered font-monospace" style="font-size:0.8rem">
+                                    <thead><tr>{% for c in admin_columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+                                    <tbody>
+                                        {% for row in admin_result %}
+                                        <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <div class="text-muted small">{{ admin_result | length }} baris</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== TAB KELOLA NILAI ===== -->
+        <div class="tab-pane fade {% if active_tab == 'nilaidb' %}show active{% endif %}" id="tabNilaiDB">
+            <div class="card" style="border-radius: 0 16px 16px 16px; padding: 1.5rem;">
+                <div class="row g-4">
+
+                    <!-- Form Input Nilai -->
+                    <div class="col-lg-5">
+                        <div class="card p-4">
+                            <h5 class="mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Input Nilai</h5>
+                            <form method="POST" action="/nilai/simpan" id="formNilai">
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Kelas</label>
+                                        <select class="form-select" name="kelas" id="nilaiKelas" required onchange="loadSiswaNilai()">
+                                            <option value="">-- Pilih --</option>
+                                            <option value="X">Kelas X</option>
+                                            <option value="XI">Kelas XI</option>
+                                            <option value="XII">Kelas XII</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Tanggal</label>
+                                        <input type="date" class="form-control" name="tanggal" value="{{ today }}" required>
+                                    </div>
+                                    <div class="col-8">
+                                        <label class="form-label fw-semibold">Jenis Nilai</label>
+                                        <select class="form-select" name="jenis" id="jenisSelect" onchange="toggleJenisBaru()" required>
+                                            {% for j in jenis_nilai %}
+                                            <option value="{{ j }}">{{ j }}</option>
+                                            {% endfor %}
+                                            <option value="__baru__">+ Jenis Baru...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-4" id="jenisBaru" style="display:none">
+                                        <label class="form-label fw-semibold">Nama Jenis</label>
+                                        <input type="text" class="form-control" name="jenis_input" placeholder="cth: Kuis 1">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Keterangan <span class="text-muted fw-normal">(opsional)</span></label>
+                                        <input type="text" class="form-control" name="keterangan" placeholder="cth: Materi Bab 3">
+                                    </div>
+                                </div>
+                                <div id="daftarSiswaNilai" class="d-none">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">Daftar Siswa</h6>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="isiNilaiDefault()">Isi 0 Semua</button>
+                                    </div>
+                                    <div class="table-responsive" style="max-height:320px;overflow-y:auto">
+                                        <table class="table table-sm table-bordered">
+                                            <thead><tr><th>#</th><th>Nama</th><th>Nilai (0-100)</th></tr></thead>
+                                            <tbody id="tabelSiswaNilai"></tbody>
+                                        </table>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100 mt-2">
+                                        <i class="bi bi-save-fill me-1"></i>Simpan Nilai
+                                    </button>
+                                </div>
+                                <div id="muatSiswaBtn" class="mt-2">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="loadSiswaNilai()">
+                                        <i class="bi bi-people-fill me-1"></i>Muat Daftar Siswa
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Tabel Nilai DB -->
+                    <div class="col-lg-7">
+                        <div class="card p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0"><i class="bi bi-table text-success me-2"></i>Data Nilai Tersimpan</h5>
+                                <a href="/export/nilai" class="btn btn-success btn-sm">
+                                    <i class="bi bi-file-earmark-excel-fill me-1"></i>Export
+                                </a>
+                            </div>
+
+                            <!-- Filter -->
+                            <div class="row g-2 mb-3">
+                                <div class="col-4">
+                                    <select class="form-select form-select-sm" id="filterKelasNilai" onchange="filterNilai()">
+                                        <option value="">Semua Kelas</option>
+                                        <option value="X">Kelas X</option>
+                                        <option value="XI">Kelas XI</option>
+                                        <option value="XII">Kelas XII</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <select class="form-select form-select-sm" id="filterJenisNilai" onchange="filterNilai()">
+                                        <option value="">Semua Jenis</option>
+                                        {% for j in jenis_tersedia %}
+                                        <option value="{{ j }}">{{ j }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <input type="text" class="form-control form-control-sm" id="filterNamaNilai" oninput="filterNilai()" placeholder="Cari nama...">
+                                </div>
+                            </div>
+
+                            <div class="table-responsive" style="max-height:420px;overflow-y:auto">
+                                <table class="table table-sm table-hover" id="tabelNilaiDB">
+                                    <thead><tr><th>Tanggal</th><th>Kelas</th><th>Jenis</th><th>Nama</th><th>Nilai</th><th>Grade</th><th>Ket</th><th></th></tr></thead>
+                                    <tbody>
+                                        {% for r in nilai_list %}
+                                        <tr data-kelas="{{ r.kelas }}" data-jenis="{{ r.jenis }}" data-nama="{{ r.nama | lower }}">
+                                            <td class="text-muted small">{{ r.tanggal }}</td>
+                                            <td>{{ r.kelas }}</td>
+                                            <td><span class="badge bg-secondary">{{ r.jenis }}</span></td>
+                                            <td class="fw-semibold">{{ r.nama }}</td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <div class="progress flex-grow-1" style="height:6px">
+                                                        <div class="progress-bar" style="width:{{ r.nilai }}%;background-color:
+                                                            {% if r.nilai >= 90 %}#1a56db{% elif r.nilai >= 80 %}#057a55{% elif r.nilai >= 70 %}#c27803{% else %}#c81e1e{% endif %}">
+                                                        </div>
+                                                    </div>
+                                                    <small>{{ r.nilai | int }}</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% set g = r.nilai %}
+                                                <span class="badge" style="background-color:
+                                                    {% if g >= 90 %}#1a56db{% elif g >= 80 %}#057a55{% elif g >= 70 %}#c27803{% elif g >= 60 %}#c81e1e{% else %}#6b7280{% endif %}">
+                                                    {% if g >= 90 %}A{% elif g >= 80 %}B{% elif g >= 70 %}C{% elif g >= 60 %}D{% else %}E{% endif %}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted small">{{ r.keterangan or '-' }}</td>
+                                            <td>
+                                                <a href="/nilai/hapus/{{ r.id }}" class="btn btn-sm btn-outline-danger py-0"
+                                                    onclick="return confirm('Hapus nilai ini?')">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-inbox fs-2"></i><br>Belum ada data nilai</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div><!-- end tab-content -->
+</div>
+
+<!-- Modal Reset Password -->
+<div class="modal fade" id="modalReset" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-key-fill me-2"></i>Reset Password</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formReset">
+            <div class="modal-body">
+                <p class="mb-3">Reset password untuk: <strong id="resetUsername"></strong></p>
+                <input type="text" class="form-control" name="new_password" placeholder="Password baru" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-primary btn-sm">Simpan</button>
+            </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Absensi -->
+<div class="modal fade" id="modalEdit" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-pencil-fill me-2"></i>Edit Absensi</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formEdit">
+            <div class="modal-body">
+                <p class="mb-1 fw-semibold" id="editNama"></p>
+                <p class="text-muted small mb-3" id="editTanggal"></p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Status</label>
+                    <select class="form-select" name="status" id="editStatus">
+                        <option>Hadir</option>
+                        <option>Sakit</option>
+                        <option>Izin</option>
+                        <option>Alpha</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label fw-semibold">Keterangan</label>
+                    <input type="text" class="form-control" name="keterangan" id="editKeterangan" placeholder="Opsional">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save-fill me-1"></i>Simpan</button>
+            </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleJenisBaru() {
+    const v = document.getElementById('jenisSelect').value;
+    document.getElementById('jenisBaru').style.display = v === '__baru__' ? '' : 'none';
+    document.querySelector('[name=jenis_input]').required = v === '__baru__';
+}
+
+function loadSiswaNilai() {
+    const kelas = document.getElementById('nilaiKelas').value;
+    if (!kelas) return;
+    const siswa = studentsByClass[kelas] || [];
+    const tbody = document.getElementById('tabelSiswaNilai');
+    tbody.innerHTML = '';
+    siswa.forEach((nama, i) => {
+        tbody.innerHTML += `<tr>
+            <td>${i+1}</td>
+            <td class="fw-semibold">${nama}<input type="hidden" name="nama[]" value="${nama}"></td>
+            <td><input type="number" class="form-control form-control-sm nilai-input" name="nilai[]"
+                min="0" max="100" step="0.5" placeholder="0-100" required></td>
+        </tr>`;
+    });
+    document.getElementById('daftarSiswaNilai').classList.remove('d-none');
+    document.getElementById('muatSiswaBtn').classList.add('d-none');
+}
+
+function isiNilaiDefault() {
+    document.querySelectorAll('.nilai-input').forEach(i => i.value = 0);
+}
+
+function filterNilai() {
+    const kelas = document.getElementById('filterKelasNilai').value.toLowerCase();
+    const jenis = document.getElementById('filterJenisNilai').value.toLowerCase();
+    const nama  = document.getElementById('filterNamaNilai').value.toLowerCase();
+    document.querySelectorAll('#tabelNilaiDB tbody tr').forEach(tr => {
+        const ok = (!kelas || tr.dataset.kelas?.toLowerCase() === kelas)
+                && (!jenis || tr.dataset.jenis?.toLowerCase() === jenis)
+                && (!nama  || tr.dataset.nama?.includes(nama));
+        tr.style.display = ok ? '' : 'none';
+    });
+}
+
+function bukaReset(id, username) {
+    document.getElementById('resetUsername').textContent = username;
+    document.getElementById('formReset').action = '/users/reset-password/' + id;
+}
+
+function toggleKelas() {
+    const role = document.getElementById('roleSelect').value;
+    document.getElementById('kelasDiv').style.display = role === 'siswa' ? '' : 'none';
+}
+
+function setQuery(sql) {
+    document.querySelector('textarea[name=sql]').value = sql;
+}
+
+function bukaEdit(id, nama, tanggal, status, keterangan) {
+    document.getElementById('editNama').textContent = nama;
+    document.getElementById('editTanggal').textContent = tanggal;
+    document.getElementById('editStatus').value = status;
+    document.getElementById('editKeterangan').value = keterangan;
+    document.getElementById('formEdit').action = '/absensi/edit/' + id;
+}
+
+// Data siswa dari server
+const studentsByClass = {{ students_by_class | tojson }};
+const absensiHariIni = {{ absensi_hari_ini | tojson }};
+
+function loadSiswa() {
+    const kelas = document.getElementById('selectKelas').value;
+    if (!kelas) return;
+    const siswa = studentsByClass[kelas] || [];
+    const tbody = document.getElementById('tabelSiswa');
+    tbody.innerHTML = '';
+    siswa.forEach((nama, i) => {
+        const existing = absensiHariIni[nama];
+        const status = existing ? existing.status : 'Hadir';
+        const ket = existing ? (existing.keterangan || '') : '';
+        tbody.innerHTML += `
+        <tr>
+            <td>${i+1}</td>
+            <td class="fw-semibold">${nama}<input type="hidden" name="nama[]" value="${nama}"></td>
+            <td>
+                <select class="form-select form-select-sm status-select" name="status[]">
+                    ${['Hadir','Sakit','Izin','Alpha'].map(s =>
+                        `<option value="${s}" ${s===status?'selected':''}>${s}</option>`
+                    ).join('')}
+                </select>
+            </td>
+            <td><input type="text" class="form-control form-control-sm" name="keterangan[]" value="${ket}" placeholder="Opsional"></td>
+        </tr>`;
+    });
+    document.getElementById('daftarSiswa').classList.remove('d-none');
+}
+
+function setAllStatus(status) {
+    document.querySelectorAll('.status-select').forEach(s => s.value = status);
+}
+
+// Chart perbandingan kelas
+{% if summary %}
+new Chart(document.getElementById('kelasChart'), {
+    type: 'bar',
+    data: {
+        labels: ['Kelas X', 'Kelas XI', 'Kelas XII'],
+        datasets: [{
+            label: 'Rata-rata Nilai',
+            data: {{ summary.avg_values | tojson }},
+            backgroundColor: ['#1a56db', '#057a55', '#7e3af2'],
+            borderRadius: 8, borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: false, min: 80, suggestedMax: 100 } }
+    }
+});
+{% endif %}
+
+// Chart grade per kelas
+{% for kelas in ['X', 'XI', 'XII'] %}
+{% if kelas in classes %}
+new Chart(document.getElementById('gradeChart{{ kelas }}'), {
+    type: 'doughnut',
+    data: {
+        labels: ['A','B','C','D','E'],
+        datasets: [{
+            data: {{ classes[kelas].grade_values | tojson }},
+            backgroundColor: ['#1a56db','#057a55','#c27803','#c81e1e','#6b7280'],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+    }
+});
+{% endif %}
+{% endfor %}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
